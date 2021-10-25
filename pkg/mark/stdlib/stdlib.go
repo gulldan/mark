@@ -109,8 +109,9 @@ func templates(api *confluence.API) (*template.Template, error) {
 			`{{ if .Title }}<ac:parameter ac:name="title">{{ .Title }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			`<ac:rich-text-body>{{printf "\n"}}{{ end }}`,
 
-			`<ac:structured-macro ac:name="code">{{printf "\n"}}`,
-			/**/ `<ac:parameter ac:name="language">{{ .Language }}</ac:parameter>{{printf "\n"}}`,
+			`<ac:structured-macro ac:name="{{ if eq .Language "mermaid" }}cloudscript-confluence-mermaid{{ else }}code{{ end }}">{{printf "\n"}}`,
+			/**/ `{{ if eq .Language "mermaid" }}<ac:parameter ac:name="showSource">true</ac:parameter>{{printf "\n"}}{{ else }}`,
+			/**/ `<ac:parameter ac:name="language">{{ .Language }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			/**/ `<ac:parameter ac:name="collapse">{{ .Collapse }}</ac:parameter>{{printf "\n"}}`,
 			/**/ `{{ if .Title }}<ac:parameter ac:name="title">{{ .Title }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			/**/ `<ac:plain-text-body><![CDATA[{{ .Text | cdata }}]]></ac:plain-text-body>{{printf "\n"}}`,
@@ -174,6 +175,18 @@ func templates(api *confluence.API) (*template.Template, error) {
 
 		`ac:emoticon`: text(
 			`<ac:emoticon ac:name="{{ .Name }}"/>`,
+		),
+
+		/* https://confluence.atlassian.com/doc/widget-connector-macro-171180449.html#WidgetConnectorMacro-YouTube */
+
+		`ac:youtube`: text(
+			`<ac:structured-macro ac:name="widget">{{printf "\n"}}`,
+			`<ac:parameter ac:name="overlay">youtube</ac:parameter>{{printf "\n"}}`,
+			`<ac:parameter ac:name="_template">com/atlassian/confluence/extra/widgetconnector/templates/youtube.vm</ac:parameter>{{printf "\n"}}`,
+			`<ac:parameter ac:name="width">{{ or .Width "640px" }}</ac:parameter>{{printf "\n"}}`,
+			`<ac:parameter ac:name="height">{{ or .Height "360px" }}</ac:parameter>{{printf "\n"}}`,
+			`<ac:parameter ac:name="url"><ri:url ri:value="{{ .URL }}" /></ac:parameter>{{printf "\n"}}`,
+			`</ac:structured-macro>{{printf "\n"}}`,
 		),
 
 		// TODO(seletskiy): more templates here
