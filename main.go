@@ -33,10 +33,11 @@ type Flags struct {
 	TargetURL      string `docopt:"-l"`
 	BaseURL        string `docopt:"--base-url"`
 	Config         string `docopt:"--config"`
+	Ci             bool   `docopt:"--ci"`
 }
 
 const (
-	version = "6.4"
+	version = "6.7"
 	usage   = `mark - a tool for updating Atlassian Confluence pages from markdown.
 
 Docs: https://github.com/kovetskiy/mark
@@ -70,6 +71,7 @@ Options:
                         [default: auto]
   -c --config <path>   Use the specified configuration file.
                         [default: $HOME/.config/mark]
+  --ci                 Runs on CI mode. It won't fail if files are not found.
   -h --help            Show this message.
   -v --version         Show version.
 `
@@ -121,7 +123,12 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(files) == 0 {
-		log.Fatal("No files matched")
+		msg := "No files matched"
+		if flags.Ci {
+			log.Warning(msg)
+		} else {
+			log.Fatal(msg)
+		}
 	}
 
 	// Loop through files matched by glob pattern
@@ -155,6 +162,8 @@ func processFile(
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	markdown = bytes.ReplaceAll(markdown, []byte("\r\n"), []byte("\n"))
 
 	meta, markdown, err := mark.ExtractMeta(markdown)
 	if err != nil {
