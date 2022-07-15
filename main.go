@@ -120,11 +120,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if ! flags.TitleFromH1 && config.H1Title {
+	if !flags.TitleFromH1 && config.H1Title {
 		flags.TitleFromH1 = true
 	}
 
-	if ! flags.DropH1 && config.H1Drop {
+	if !flags.DropH1 && config.H1Drop {
 		flags.DropH1 = true
 	}
 
@@ -289,8 +289,8 @@ func processFile(
 			)
 			markdown = mark.DropDocumentLeadingH1(markdown)
 		}
-	
-			fmt.Println(mark.CompileMarkdown(markdown, stdlib))
+
+		fmt.Println(mark.CompileMarkdown(markdown, stdlib))
 		os.Exit(0)
 	}
 
