@@ -557,7 +557,7 @@ func (api *API) UpdatePage(
 			"labels": labels,
 			// Fix to set full-width as has changed on Confluence APIs again.
 			// https://jira.atlassian.com/browse/CONFCLOUD-65447
-			// 
+			//
 			"properties": map[string]interface{}{
 				"content-appearance-published": map[string]interface{}{
 					"value": "full-width",
