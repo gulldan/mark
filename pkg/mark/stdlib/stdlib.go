@@ -110,6 +110,9 @@ func templates(api *confluence.API) (*template.Template, error) {
 			/**/ `{{ if eq .Language "mermaid" }}<ac:parameter ac:name="showSource">true</ac:parameter>{{printf "\n"}}{{ else }}`,
 			/**/ `<ac:parameter ac:name="language">{{ .Language }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			/**/ `<ac:parameter ac:name="collapse">{{ .Collapse }}</ac:parameter>{{printf "\n"}}`,
+			/**/ `{{ if .Theme }}<ac:parameter ac:name="theme">{{ .Theme }}</ac:parameter>{{printf "\n"}}{{ end }}`,
+			/**/ `{{ if .Linenumbers }}<ac:parameter ac:name="linenumbers">{{ .Linenumbers }}</ac:parameter>{{printf "\n"}}{{ end }}`,
+			/**/ `{{ if .Firstline }}<ac:parameter ac:name="firstline">{{ .Firstline }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			/**/ `{{ if .Title }}<ac:parameter ac:name="title">{{ .Title }}</ac:parameter>{{printf "\n"}}{{ end }}`,
 			/**/ `<ac:plain-text-body><![CDATA[{{ .Text | cdata }}]]></ac:plain-text-body>{{printf "\n"}}`,
 			`</ac:structured-macro>{{printf "\n"}}`,
@@ -136,6 +139,22 @@ func templates(api *confluence.API) (*template.Template, error) {
 		`ac:jira:ticket`: text(
 			`<ac:structured-macro ac:name="jira">`,
 			`<ac:parameter ac:name="key">{{ .Ticket }}</ac:parameter>`,
+			`</ac:structured-macro>`,
+		),
+
+		/* https://confluence.atlassian.com/doc/jira-issues-macro-139380.html */
+		`ac:jiraissues`: text(
+			`<ac:structured-macro ac:name="jiraissues">`,
+			`<ac:parameter ac:name="anonymous">{{ or .Anonymous false }}</ac:parameter>`,
+			`<ac:parameter ac:name="baseurl">{{ or .BaseURL .URL }}</ac:parameter>`,
+			`<ac:parameter ac:name="columns">{{ or .Columns "type;key;summary;assignee;reporter;priority;status;resolution;created;updated;due" }}</ac:parameter>`,
+			`<ac:parameter ac:name="count">{{ or .Count false }}</ac:parameter>`,
+			`<ac:parameter ac:name="cache">{{ or .Cache "on" }}</ac:parameter>`,
+			`<ac:parameter ac:name="height">{{ or .Height 480 }}</ac:parameter>`,
+			`<ac:parameter ac:name="renderMode">{{ or .RenderMode "static" }}</ac:parameter>`,
+			`<ac:parameter ac:name="title">{{ or .Title "Jira Issues" }}</ac:parameter>`,
+			`<ac:parameter ac:name="url">{{ .URL }}</ac:parameter>`,
+			`<ac:parameter ac:name="width">{{ or .Width "100%" }}</ac:parameter>`,
 			`</ac:structured-macro>`,
 		),
 
@@ -214,6 +233,21 @@ func templates(api *confluence.API) (*template.Template, error) {
 			`{{ if .Align}}<ac:parameter ac:name="align">{{ .Align }}</ac:parameter>{{printf "\n"}}{{end}}`,
 			`<ac:parameter ac:name="width">{{ or .Width "640px" }}</ac:parameter>{{printf "\n"}}`,
 			`<ac:parameter ac:name="height">{{ or .Height "360px" }}</ac:parameter>{{printf "\n"}}`,
+			`</ac:structured-macro>{{printf "\n"}}`,
+		),
+
+		/* https://confluence.atlassian.com/doc/blog-posts-macro-139470.html */
+
+		`ac:blog-posts`: text(
+			`<ac:structured-macro ac:name="blog-posts">{{printf "\n"}}`,
+			`{{ if .Content }}<ac:parameter ac:name="content">{{ .Content }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Spaces }}<ac:parameter ac:name="spaces">{{ .Spaces }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Author }}<ac:parameter ac:name="author">{{ .Author }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Time }}<ac:parameter ac:name="time">{{ .Time }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Reverse }}<ac:parameter ac:name="reverse">{{ .Reverse }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Sort }}<ac:parameter ac:name="sort">{{ .Sort }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Max }}<ac:parameter ac:name="max">{{ .Max }}</ac:parameter>{{printf "\n"}}{{end}}`,
+			`{{ if .Label }}<ac:parameter ac:name="label">{{ .Label }}</ac:parameter>{{printf "\n"}}{{end}}`,
 			`</ac:structured-macro>{{printf "\n"}}`,
 		),
 
