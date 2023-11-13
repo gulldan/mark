@@ -56,6 +56,13 @@ Also, optional following headers are supported:
 * blogpost: [Blog post](https://confluence.atlassian.com/doc/blog-posts-834222533.html) in `Space`.  Cannot have `Parent`(s)
 
 ```markdown
+<!-- Content-Appearance: (full-width|fixed) -->
+```
+
+* (default) full-width: content will fill the full page width
+* fixed: content will be rendered in a fixed narrow view
+
+```markdown
 <!-- Sidebar: <h2>Test</h2> -->
 ```
 
@@ -67,6 +74,8 @@ to the template relative to current working dir, e.g.:
 ```markdown
 <!-- Include: <path> -->
 ```
+
+If the template cannot be found relative to the current directory, a fallback directory can be defined via `--include-path`. This way it is possible to have global include files while local ones will still take precedence.
 
 Optionally the delimiters can be defined:
 
@@ -120,7 +129,7 @@ be replaced with specified template:
      <yaml-data> -->
 ```
 
-**NOTE**: Make sure to define your macros after your metadata (Title/Space), 
+**NOTE**: Make sure to define your macros after your metadata (Title/Space),
 mark will stop processing metadata if it hits a Macro.
 
 Capture groups can be defined in the macro's <regexp> which can be later
@@ -161,6 +170,36 @@ The key's value must be a string which defines the template's content.
   </tblbox>
 ```
 
+### Customizing the page layout
+
+If you set the Layout to plain, the page layout can be customized using HTML comments inside the markdown:
+
+```markdown
+<!-- Layout: plain -->
+<!-- ac:layout -->
+
+<!-- ac:layout-section type:three_with_sidebars -->
+<!-- ac:layout-cell -->
+More Content
+<!-- ac:layout-cell end -->
+<!-- ac:layout-cell -->
+More Content
+<!-- ac:layout-cell end -->
+<!-- ac:layout-cell -->
+Even More Content
+<!-- ac:layout-cell end -->
+<!-- ac:layout-section end -->
+
+<!-- ac:layout-section type:single -->
+<!-- ac:layout-cell -->
+Still More Content
+<!-- ac:layout-cell end -->
+<!-- ac:layout-section end -->
+
+<!-- ac:layout end -->
+```
+
+Please be aware that mark does not validate the layout, so it's your responsibility to create a valid layout.
 
 ### Code Blocks
 
@@ -252,6 +291,10 @@ By default, mark provides several built-in templates and macros:
 
   See: https://confluence.atlassian.com/conf59/status-macro-792499207.html
 
+* template `ac:jira:filter` to include JIRA Filters/Searches. Parameters:
+  - JQL: The "JQL" query of the search
+  - Server (Optional): The Jira server to fetch the query from if its not the default of "System Jira"
+
 * template `ac:jiraissues` to include a list of JIRA tickets. Parameters:
   - URL (Required), The URL of the XML view of your selected issues. (link to the filter)
   - Anonymous (Optional) If this parameter is set to 'true', your JIRA application will return only the issues which allow unrestricted viewing. That is, the issues which are visible to anonymous viewers. If this parameter is omitted or set to 'false', then the results depend on how your administrator has configured the communication between the JIRA application and Confluence. By default, Confluence will show only the issues which the user is authorised to view.
@@ -293,8 +336,8 @@ By default, mark provides several built-in templates and macros:
 
 * template: `ac:youtube` to include YouTube Widget. Parameters:
   - URL: YouTube video endpoint
-  - Width: Width in px. Defualts to "640px"
-  - Height: Height in px. Defualts to "360px"
+  - Width: Width in px. Defaults to "640px"
+  - Height: Height in px. Defaults to "360px"
 
   See: https://confluence.atlassian.com/doc/widget-connector-macro-171180449.html#WidgetConnectorMacro-YouTube
 
@@ -363,6 +406,60 @@ By default, mark provides several built-in templates and macros:
   - Reverse: Reverses the Sort parameter from oldest to newest (default: false)
 
   See: https://confluence.atlassian.com/doc/blog-posts-macro-139470.html
+
+* template: `ac:include` to include a page
+  - Page: the page to be included
+  - Space: the space the page is in (optional, otherwise same space)
+
+* template: `ac:excerpt-include` to include the excerpt from another page
+  - Page: the page the excerpt should be included from
+  - NoPanel: Determines whether Confluence will display a panel around the excerpted content (optional, default: false)
+
+* template: `ac:excerpt` to create an excerpt and include it in the page
+  - Excerpt: The text you want to include
+  - OutputType: Determines whether the content of the Excerpt macro body is displayed on a new line or inline (optional, options: "BLOCK" or "INLINE", default: BLOCK)
+  - Hidden: Hide the excerpt content (optional, default: false)
+
+* template: `ac:anchor` to set an anchor inside a page
+  - Anchor: Text for the anchor
+
++ template: `ac:expand` to display an expandable/collapsible section of text on your page
+  - Title: Defines the text next to the expand/collapse icon.
+  - Body: The Text that it is expanded to.
+
+* template: `ac:profile` to display a short summary of a given Confluence user's profile.
+  - Name: The username of the Confluence user whose profile summary you wish to show.
+
+* template: `ac:contentbylabel` to display a list of pages, blog posts or attachments that have particular labels
+  - CQL: The CQL query to discover the content
+
+* template: `ac:detailssummary` to show summary information from one page on a another page
+  - Headings: Column headings to show
+  - CQL: The CQL query to discover the pages
+  - SortBy: Sort by a specific column heading
+
+* template: `ac:details` to create page properties
+  - Body: Must contain a table with two rows, the table headings are used as property key. The table content is the value.
+
+* template: `ac:panel` to display a block of text within a customisable panel
+  - Title: Panel title (optional)
+  - Body:  Body text of the panel
+  - BGColor: Background Color
+  - TitleBGColor: Background color of the title bar
+  - TitleColor: Text color of the title
+  - BorderStyle: Style of the panel's border
+
+* template `ac:recently-updated` to display a list of most recently changed content
+  - Spaces: List of Spaces to watch (optional, default is current Space)
+  - ShowProfilePic: Show profile picture of editor
+  - Max: Maximum number of changes
+  - Types: Include these content types only (comments, blogposts, pages)
+  - Theme: Apperance of the macro (concise, social, sidebar)
+  - HideHeading: Determines whether the macro hides or displays the text 'Recently Updated' as a title above the list of content
+  - Labels: Filter the results by label. The macro will display only the pages etc which are tagged with the label(s) you specify here.
+
+* template: `ac:pagetreesearch` to add a search box to your Confluence page.
+  - Root: Name of the root page whose hierarchy of pages will be searched by this macro. If this not specified, the root page is the current page.
 
 * macro `@{...}` to mention user by name specified in the braces.
 
@@ -455,8 +552,48 @@ See [Confluence TOC Macro] for the list of parameters - keep in mind that here
 they start with capital letters. Every skipped field will have the default
 value, so feel free to include only the ones that you require.
 
-
 [Confluence TOC Macro]:https://confluence.atlassian.com/conf59/table-of-contents-macro-792499210.html
+
+### Insert PageTree
+
+```markdown
+# My First Heading
+<!-- Include: ac:pagetree -->
+```
+
+The pagetree macro works almost the same as the TOC above, but the tree behavior
+is more desirable for creating placeholder pages above collections of SOPs.
+
+The default pagetree macro behavior is to insert a tree rooted @self.
+
+The following parameters can be used to alter your default configuration with
+parameters described more in depth here:[Confluence Pagetree Macro].
+
+Parameters:
+
+* Title (of tree root page)
+* Sort
+* Excerpt
+* Reverse
+* SearchBox
+* ExpandCollapseAll
+* StartDepth
+
+[Confluence Pagetree Macro]:https://confluence.atlassian.com/conf59/page-tree-macro-792499177.html
+
+E.G.
+```markdown
+<!-- Macro: :pagetree:
+     Template: ac:pagetree
+     Reverse: 'true'
+     ExpandCollapseAll: 'true'
+     StartDepth: 2 -->
+
+# My First Heading
+
+:pagetree:
+```
+
 ### Insert Children Display
 
 To include Children Display (TOC displaying children pages) use following macro:
@@ -510,7 +647,50 @@ See task MYJIRA-123.
 This is a [link to an existing confluence page](ac:Pagetitle)
 
 And this is how to link when the linktext is the same as the [Pagetitle](ac:)
+
+Link to a [page title containing spaces](<ac:With Multiple Words>)
 ```
+
+### Upload and included inline images
+
+```markdown
+![Example](../images/examples.png)
+```
+will automatically upload the inlined image as an attachment and inline the image using the `ac:image` template.
+
+If the file is not found, it will inline the image using the `ac:image` template and link to the image.
+
+### Add width for an image
+
+Use the following macro:
+```markdown
+<!-- Macro: \!\[.*\]\((.+)\)\<\!\-\- width=(.*) \-\-\>
+     Template: ac:image
+     Attachment: ${1}
+     Width: ${2} -->
+```
+And attach any image with the following
+```markdown
+![Example](../images/example.png)<!-- width=300 -->
+```
+The width will be the commented html after the image (in this case 300px).
+
+Currently this is not compatible with the automated upload of inline images.
+
+### Render Mermaid Diagram
+
+Confluence doesn't provide [mermaid.js](https://github.com/mermaid-js/mermaid) support natively. Mark provides a convenient way to enable the feature like [Github does](https://github.blog/2022-02-14-include-diagrams-markdown-files-mermaid/).
+As long as you have a code block and are marked as "mermaid", the mark will automatically render it as a PNG image and insert into before the code block.
+
+    ```mermaid title diagrams_example
+    graph TD;
+    A-->B;
+    ```
+
+In order to properly render mermaid, you can choose between the following mermaid providers:
+
+* "mermaid-go" via [mermaid.go](https://github.com/dreampuf/mermaid.go)
+* "cloudscript" via [cloudscript-io-mermaid-addon](https://marketplace.atlassian.com/apps/1219878/cloudscript-io-mermaid-addon)
 
 ## Installation
 
@@ -557,48 +737,61 @@ $ cp mark /usr/local/bin
 ## Usage
 
 ```
-mark [options] [-u <username>] [-p <password>] [-k] [-l <url>] -f <file>
-mark [options] [-u <username>] [-p <password>] [-k] [-b <url>] -f <file>
-mark [options] [-u <username>] [-p <password>] [--drop-h1] -f <file>
-mark -v | --version
-mark -h | --help
+USAGE:
+   mark [global options] [arguments...]
+
+VERSION:
+   9.10.1
+
+DESCRIPTION:
+   Mark is a tool to update Atlassian Confluence pages from markdown. Documentation is available here: https://github.com/kovetskiy/mark
+
+GLOBAL OPTIONS:
+   --files value, -f value                       use specified markdown file(s) for converting to html. Supports file globbing patterns (needs to be quoted). [$MARK_FILES]
+   --compile-only                                show resulting HTML and don't update Confluence page content. (default: false) [$MARK_COMPILE_ONLY]
+   --dry-run                                     resolve page and ancestry, show resulting HTML and exit. (default: false) [$MARK_DRY_RUN]
+   --edit-lock, -k                               lock page editing to current user only to prevent accidental manual edits over Confluence Web UI. (default: false) [$MARK_EDIT_LOCK]
+   --drop-h1, --h1_drop                          don't include the first H1 heading in Confluence output. (default: false) [$MARK_H1_DROP]
+   --strip-linebreak                             remove linebreaks inside of tags, to accomodate Confluence non-standard behavior (default: false)
+   --title-from-h1, --h1_title                   extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata. (default: false) [$MARK_H1_TITLE]
+   --minor-edit                                  don't send notifications while updating Confluence page. (default: false) [$MARK_MINOR_EDIT]
+   --color value                                 display logs in color. Possible values: auto, never. (default: "auto") [$MARK_COLOR]
+   --debug                                       enable debug logs. (default: false) [$MARK_DEBUG]
+   --trace                                       enable trace logs. (default: false) [$MARK_TRACE]
+   --username value, -u value                    use specified username for updating Confluence page. [$MARK_USERNAME]
+   --password value, -p value                    use specified token for updating Confluence page. Specify - as password to read password from stdin, or your Personal access token. Username is not mandatory if personal access token is provided. For more info please see: https://developer.atlassian.com/server/confluence/confluence-server-rest-api/#authentication. [$MARK_PASSWORD]
+   --target-url value, -l value                  edit specified Confluence page. If -l is not specified, file should contain metadata (see above). [$MARK_TARGET_URL]
+   --base-url value, -b value, --base_url value  base URL for Confluence. Alternative option for base_url config field. [$MARK_BASE_URL]
+   --config value, -c value                      use the specified configuration file. (default: System specific) [$MARK_CONFIG]
+   --ci                                          run on CI mode. It won't fail if files are not found. (default: false) [$MARK_CI]
+   --space value                                 use specified space key. If the space key is not specified, it must be set in the page metadata. [$MARK_SPACE]
+   --parents value                               A list containing the parents of the document separated by parents-delimiter (default: '/'). These will be preprended to the ones defined in the document itself. [$MARK_PARENTS]
+   --parents-delimiter value                     The delimiter used for the nested parent (default: "/") [$MARK_PARENTS_DELIMITER]
+   --mermaid-provider value                      defines the mermaid provider to use. Supported options are: cloudscript, mermaid-go. (default: "cloudscript") [$MARK_MERMAID_PROVIDER]
+   --mermaid-scale value                         defines the scaling factor for mermaid renderings. (default: 1) [$MARK_MERMAID_SCALE]
+   --include-path value                          Path for shared includes, used as a fallback if the include doesn't exist in the current directory. [$MARK_INCLUDE_PATH]
+   --help, -h                                    show help
+   --version, -v                                 print the version
 ```
 
-- `-u <username>` — Use specified username for updating Confluence page.
-- `-p <password>` — Use specified password for updating Confluence page.
-    Specify `-` as password to read password from stdin.
-- `-l <url>` — Edit specified Confluence page.
-    If -l is not specified, file should contain metadata (see above).
-- `-b <url>` or `--base-url <url>` – Base URL for Confluence.
-    Alternative option for `base_url` config field.
-- `-f <file>` — Use specified markdown file(s) for converting to html. Supports file globbing patterns (needs to be quoted).
-- `-c <path>` or `--config <path>` — Specify a path to the configuration file.
-- `-k` — Lock page editing to current user only to prevent accidental
-    manual edits over Confluence Web UI.
-- `--space <space>` - Use specified space key. If the space key is not specified, it must be set in the page metadata.
-- `--drop-h1` – Don't include H1 headings in Confluence output.
-  This option corresponds to the `h1_drop` setting in the configuration file.
-- `--title-from-h1` - Extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata.
-  This option corresponds to the `h1_title` setting in the configuration file.
-- `--dry-run` — Show resulting HTML and don't update Confluence page content.
-- `--minor-edit` — Don't send notifications while updating Confluence page.
-- `--trace` — Enable trace logs.
-- `-v | --version` — Show version.
-- `-h | --help` — Show help screen and call 911.
-
 You can store user credentials in the configuration file, which should be
-located in ~/.config/mark (or specified via `-c --config <path>`) with the following format (TOML):
+located in a system specific directory (or specified via `-c --config <path>`) with the following format (TOML):
 
 ```toml
 username = "your-email"
 password = "password-or-api-key-for-confluence-cloud"
 # If you are using Confluence Cloud add the /wiki suffix to base_url
-base_url = "http://confluence.local"
-h1_title = true
-h1_drop = true
+base-url = "http://confluence.local"
+title-from-h1 = true
+drop-h1 = true
 ```
 
 **NOTE**: Labels aren't supported when using `minor-edit`!
+
+**NOTE**: The system specific locations are described in here:
+https://pkg.go.dev/os#UserConfigDir.
+Currently these are:
+On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config. On Darwin, it returns $HOME/Library/Application Support. On Windows, it returns %AppData%. On Plan 9, it returns $home/lib.
 
 # Tricks
 
