@@ -336,7 +336,7 @@ func templates(api *confluence.API) (*template.Template, error) {
 		/* https://confluence.atlassian.com/conf59/user-profile-macro-792499223.html */
 
 		`ac:profile`: text(
-			`{{ with .Name | user  }}`,
+			`{{ with .Name | user }}`,
 			`<ac:structured-macro ac:name="profile">`,
 			`<ac:parameter ac:name="user">`,
 			`{{ if .AccountID }}`,
@@ -425,6 +425,13 @@ func templates(api *confluence.API) (*template.Template, error) {
 			`<ac:parameter ac:name="labels">{{ or .Labels "" }}</ac:parameter>`,
 			`<ac:parameter ac:name="hideHeading">{{ or .HideHeading "" }}</ac:parameter>`,
 			`<ac:parameter ac:name="theme">{{ or .Theme "" }}</ac:parameter>`,
+			`</ac:structured-macro>`,
+		),
+		/* https://confluence.atlassian.com/conf59/column-macro-792499085.html */
+		`ac:column`: text(
+			`<ac:structured-macro ac:name="column">`,
+			`<ac:parameter ac:name="width">{{ or .Width "" }}</ac:parameter>`,
+			`<ac:rich-text-body>{{ or .Body "" }}</ac:rich-text-body>`,
 			`</ac:structured-macro>`,
 		),
 

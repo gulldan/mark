@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/kovetskiy/lorg"
 	"github.com/kovetskiy/mark/pkg/confluence"
 	"github.com/kovetskiy/mark/pkg/mark"
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	version     = "9.10.1"
+	version     = "9.11.1"
 	usage       = "A tool for updating Atlassian Confluence pages from markdown."
 	description = `Mark is a tool to update Atlassian Confluence pages from markdown. Documentation is available here: https://github.com/kovetskiy/mark`
 )
@@ -152,7 +153,7 @@ var flags = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{
 		Name:    "parents",
 		Value:   "",
-		Usage:   "A list containing the parents of the document separated by parents-delimiter (default: '/'). These will be preprended to the ones defined in the document itself.",
+		Usage:   "A list containing the parents of the document separated by parents-delimiter (default: '/'). These will be prepended to the ones defined in the document itself.",
 		EnvVars: []string{"MARK_PARENTS"},
 	}),
 	altsrc.NewStringFlag(&cli.StringFlag{
@@ -239,7 +240,7 @@ func RunMark(cCtx *cli.Context) error {
 
 	api := confluence.NewAPI(creds.BaseURL, creds.Username, creds.Password)
 
-	files, err := filepath.Glob(cCtx.String("files"))
+	files, err := doublestar.FilepathGlob(cCtx.String("files"))
 	if err != nil {
 		return err
 	}
