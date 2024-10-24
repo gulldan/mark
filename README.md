@@ -202,6 +202,16 @@ Still More Content
 
 Please be aware that mark does not validate the layout, so it's your responsibility to create a valid layout.
 
+### Placeholders
+
+You can use this to define placeholders:
+
+```markdown
+<!-- ac:placeholder -->
+Placeholder
+<!-- ac:placeholder end -->
+```
+
 ### Code Blocks
 
 If you have long code blocks, you can make them collapsible with the [Code Block Macro]:
@@ -252,7 +262,15 @@ some long code block
 Block Quotes are converted to Confluence Info/Warn/Note box when the following conditions are met
 
 1. The BlockQuote is on the root level of the document (not nested)
-1. The first line of the BlockQuote contains one of the following patterns `Info/Warn/Note`
+1. The first line of the BlockQuote contains one of the following patterns `Info/Warn/Note` or [Github MD Alerts style](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts) `[!NOTE]/[!TIP]/[!IMPORTANT]/[!WARNING]/[!CAUTION]`
+
+| Github Alerts | Confluence |
+|---------------|------------|
+| Tip (green lightbulb)   | Tip (green checkmark in circle) |
+| Note (blue I in circle) | Info (blue I in circle) |
+| Important (purple exclamation mark in speech bubble) | Info (blue I in circle) |
+| Warning (yellow exclamation mark in triangle) | Note (yellow exclamation mark in triangle) |
+| Caution (red exclamation mark in hexagon) | Warning (red exclamation mark in hexagon) |
 
 In any other case the default behaviour will be resumed and html `<blockquote>` tag will be used
 
@@ -436,6 +454,7 @@ By default, mark provides several built-in templates and macros:
 
 * template: `ac:detailssummary` to show summary information from one page on a another page
   * Headings: Column headings to show
+  * FirstColumn: Name of the Title Column
   * CQL: The CQL query to discover the pages
   * SortBy: Sort by a specific column heading
 
@@ -465,6 +484,11 @@ By default, mark provides several built-in templates and macros:
 * template: `ac:column` To be used with the section macro to define the columns in a page.
   * Width: Width of the column
   * Body: The content of the column
+
+* template: `ac:multimedia` to embedd an attached video, animation or other multimedia files in a Confluence page
+  * Name: Name of the file
+  * Width: Width of the video (optional)
+  * AutoPlay: Start playing the file on page load (default: false)
 
 * macro `@{...}` to mention user by name specified in the braces.
 
@@ -744,11 +768,14 @@ $ cp mark /usr/local/bin
 ## Usage
 
 ```bash
+NAME:
+   mark - A tool for updating Atlassian Confluence pages from markdown.
+
 USAGE:
-   mark [global options] [arguments...]
+   mark [global options] 
 
 VERSION:
-   9.11.1
+   11.3.0
 
 DESCRIPTION:
    Mark is a tool to update Atlassian Confluence pages from markdown. Documentation is available here: https://github.com/kovetskiy/mark
@@ -759,9 +786,11 @@ GLOBAL OPTIONS:
    --dry-run                                     resolve page and ancestry, show resulting HTML and exit. (default: false) [$MARK_DRY_RUN]
    --edit-lock, -k                               lock page editing to current user only to prevent accidental manual edits over Confluence Web UI. (default: false) [$MARK_EDIT_LOCK]
    --drop-h1, --h1_drop                          don't include the first H1 heading in Confluence output. (default: false) [$MARK_H1_DROP]
-   --strip-linebreak                             remove linebreaks inside of tags, to accomodate Confluence non-standard behavior (default: false)
+   --strip-linebreaks, -L                        remove linebreaks inside of tags, to accomodate non-standard Confluence behavior (default: false) [$MARK_STRIP_LINEBREAK]
    --title-from-h1, --h1_title                   extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata. (default: false) [$MARK_H1_TITLE]
+   --title-append-generated-hash                 appends a short hash generated from the path of the page (space, parents, and title) to the title (default: false) [$MARK_TITLE_APPEND_GENERATED_HASH]
    --minor-edit                                  don't send notifications while updating Confluence page. (default: false) [$MARK_MINOR_EDIT]
+   --version-message value                       add a message to the page version, to explain the edit (default: "") [$MARK_VERSION_MESSAGE]
    --color value                                 display logs in color. Possible values: auto, never. (default: "auto") [$MARK_COLOR]
    --debug                                       enable debug logs. (default: false) [$MARK_DEBUG]
    --trace                                       enable trace logs. (default: false) [$MARK_TRACE]
@@ -773,7 +802,7 @@ GLOBAL OPTIONS:
    --ci                                          run on CI mode. It won't fail if files are not found. (default: false) [$MARK_CI]
    --space value                                 use specified space key. If the space key is not specified, it must be set in the page metadata. [$MARK_SPACE]
    --parents value                               A list containing the parents of the document separated by parents-delimiter (default: '/'). These will be prepended to the ones defined in the document itself. [$MARK_PARENTS]
-   --parents-delimiter value                     The delimiter used for the nested parent (default: "/") [$MARK_PARENTS_DELIMITER]
+   --parents-delimiter value                     The delimiter used for the parents list (default: "/") [$MARK_PARENTS_DELIMITER]
    --mermaid-provider value                      defines the mermaid provider to use. Supported options are: cloudscript, mermaid-go. (default: "cloudscript") [$MARK_MERMAID_PROVIDER]
    --mermaid-scale value                         defines the scaling factor for mermaid renderings. (default: 1) [$MARK_MERMAID_SCALE]
    --include-path value                          Path for shared includes, used as a fallback if the include doesn't exist in the current directory. [$MARK_INCLUDE_PATH]

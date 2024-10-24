@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/kovetskiy/lorg"
-	"github.com/kovetskiy/mark/pkg/confluence"
-	"github.com/kovetskiy/mark/pkg/mark"
-	"github.com/kovetskiy/mark/pkg/mark/attachment"
-	"github.com/kovetskiy/mark/pkg/mark/includes"
-	"github.com/kovetskiy/mark/pkg/mark/macro"
-	"github.com/kovetskiy/mark/pkg/mark/stdlib"
-	"github.com/kovetskiy/mark/pkg/mark/vfs"
+	"github.com/kovetskiy/mark/attachment"
+	"github.com/kovetskiy/mark/confluence"
+	"github.com/kovetskiy/mark/includes"
+	"github.com/kovetskiy/mark/macro"
+	mark "github.com/kovetskiy/mark/markdown"
+	"github.com/kovetskiy/mark/metadata"
+	"github.com/kovetskiy/mark/page"
+	"github.com/kovetskiy/mark/stdlib"
+	"github.com/kovetskiy/mark/vfs"
 	"github.com/reconquest/karma-go"
 	"github.com/reconquest/pkg/log"
 	"github.com/urfave/cli/v2"
@@ -24,7 +27,7 @@ import (
 )
 
 const (
-	version     = "9.11.1"
+	version     = "11.3.0"
 	usage       = "A tool for updating Atlassian Confluence pages from markdown."
 	description = `Mark is a tool to update Atlassian Confluence pages from markdown. Documentation is available here: https://github.com/kovetskiy/mark`
 )
@@ -79,10 +82,22 @@ var flags = []cli.Flag{
 		EnvVars: []string{"MARK_H1_TITLE"},
 	}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{
+		Name:    "title-append-generated-hash",
+		Value:   false,
+		Usage:   "appends a short hash generated from the path of the page (space, parents, and title) to the title",
+		EnvVars: []string{"MARK_TITLE_APPEND_GENERATED_HASH"},
+	}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{
 		Name:    "minor-edit",
 		Value:   false,
 		Usage:   "don't send notifications while updating Confluence page.",
 		EnvVars: []string{"MARK_MINOR_EDIT"},
+	}),
+	altsrc.NewStringFlag(&cli.StringFlag{
+		Name:    "version-message",
+		Value:   "",
+		Usage:   "add a message to the page version, to explain the edit (default: \"\")",
+		EnvVars: []string{"MARK_VERSION_MESSAGE"},
 	}),
 	altsrc.NewStringFlag(&cli.StringFlag{
 		Name:    "color",
@@ -300,7 +315,7 @@ func processFile(
 
 	parents := strings.Split(cCtx.String("parents"), cCtx.String("parents-delimiter"))
 
-	meta, markdown, err := mark.ExtractMeta(markdown, cCtx.String("space"), cCtx.Bool("title-from-h1"), parents)
+	meta, markdown, err := metadata.ExtractMeta(markdown, cCtx.String("space"), cCtx.Bool("title-from-h1"), parents, cCtx.Bool("title-append-generated-hash"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -379,15 +394,15 @@ func processFile(
 		}
 	}
 
-	links, err := mark.ResolveRelativeLinks(api, meta, markdown, filepath.Dir(file), cCtx.String("space"), cCtx.Bool("title-from-h1"), parents)
+	links, err := page.ResolveRelativeLinks(api, meta, markdown, filepath.Dir(file), cCtx.String("space"), cCtx.Bool("title-from-h1"), parents, cCtx.Bool("title-append-generated-hash"))
 	if err != nil {
 		log.Fatalf(err, "unable to resolve relative links")
 	}
 
-	markdown = mark.SubstituteLinks(markdown, links)
+	markdown = page.SubstituteLinks(markdown, links)
 
 	if cCtx.Bool("dry-run") {
-		_, _, err := mark.ResolvePage(cCtx.Bool("dry-run"), api, meta)
+		_, _, err := page.ResolvePage(cCtx.Bool("dry-run"), api, meta)
 		if err != nil {
 			log.Fatalf(err, "unable to resolve page location")
 		}
@@ -408,7 +423,7 @@ func processFile(
 	var target *confluence.PageInfo
 
 	if meta != nil {
-		parent, page, err := mark.ResolvePage(cCtx.Bool("dry-run"), api, meta)
+		parent, page, err := page.ResolvePage(cCtx.Bool("dry-run"), api, meta)
 		if err != nil {
 			log.Fatalf(
 				karma.Describe("title", meta.Title).Reason(err),
@@ -511,10 +526,12 @@ func processFile(
 		html = buffer.String()
 	}
 
-	err = api.UpdatePage(target, html, cCtx.Bool("minor-edit"), meta.Labels, meta.ContentAppearance)
+	err = api.UpdatePage(target, html, cCtx.Bool("minor-edit"), cCtx.String("version-message"), meta.Labels, meta.ContentAppearance)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	updateLabels(api, target, meta)
 
 	if cCtx.Bool("edit-lock") {
 		log.Infof(
@@ -531,6 +548,68 @@ func processFile(
 	}
 
 	return target
+}
+
+func updateLabels(api *confluence.API, target *confluence.PageInfo, meta *metadata.Meta) {
+
+	labelInfo, err := api.GetPageLabels(target, "global")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Debug("Page Labels:")
+	log.Debug(labelInfo.Labels)
+
+	log.Debug("Meta Labels:")
+	log.Debug(meta.Labels)
+
+	delLabels := determineLabelsToRemove(labelInfo, meta)
+	log.Debug("Del Labels:")
+	log.Debug(delLabels)
+
+	addLabels := determineLabelsToAdd(meta, labelInfo)
+	log.Debug("Add Labels:")
+	log.Debug(addLabels)
+
+	if len(addLabels) > 0 {
+		_, err = api.AddPageLabels(target, addLabels)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for _, label := range delLabels {
+		_, err = api.DeletePageLabel(target, label)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+// Page has label but label not in Metadata
+func determineLabelsToRemove(labelInfo *confluence.LabelInfo, meta *metadata.Meta) []string {
+	var labels []string
+	for _, label := range labelInfo.Labels {
+		if !slices.ContainsFunc(meta.Labels, func(metaLabel string) bool {
+			return strings.EqualFold(metaLabel, label.Name)
+		}) {
+			labels = append(labels, label.Name)
+		}
+	}
+	return labels
+}
+
+// Metadata has label but Page does not have it
+func determineLabelsToAdd(meta *metadata.Meta, labelInfo *confluence.LabelInfo) []string {
+	var labels []string
+	for _, metaLabel := range meta.Labels {
+		if !slices.ContainsFunc(labelInfo.Labels, func(label confluence.Label) bool {
+			return strings.EqualFold(label.Name, metaLabel)
+		}) {
+			labels = append(labels, metaLabel)
+		}
+	}
+	return labels
 }
 
 func configFilePath() string {
