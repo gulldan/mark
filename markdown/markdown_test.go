@@ -66,7 +66,7 @@ func TestCompileMarkdownDropH1(t *testing.T) {
 
 	test := assert.New(t)
 
-        testcases, err := filepath.Glob("testdata/*.md")
+	testcases, err := filepath.Glob("testdata/*.md")
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +99,7 @@ func TestCompileMarkdownStripNewlines(t *testing.T) {
 
 	test := assert.New(t)
 
-        testcases, err := filepath.Glob("testdata/*.md")
+	testcases, err := filepath.Glob("testdata/*.md")
 	if err != nil {
 		panic(err)
 	}
@@ -110,12 +110,12 @@ func TestCompileMarkdownStripNewlines(t *testing.T) {
 			panic(err)
 		}
 		var variant string
-                switch filename {
-                case "testdata/quotes.md", "testdata/codes.md", "testdata/newlines.md", "testdata/macro-include.md":
-                        variant = "-stripnewlines"
-                default:
-                        variant = ""
-                }
+		switch filename {
+		case "testdata/quotes.md", "testdata/codes.md", "testdata/newlines.md", "testdata/macro-include.md":
+			variant = "-stripnewlines"
+		default:
+			variant = ""
+		}
 
 		markdown, htmlname, html := loadData(t, filename, variant)
 		actual, _ := CompileMarkdown(markdown, lib, filename, "", 1.0, false, true)
