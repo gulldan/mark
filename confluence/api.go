@@ -600,7 +600,7 @@ func (api *API) DeletePageLabel(page *PageInfo, label string) (*LabelInfo, error
 
 	request, err := api.rest.Res(
 		"content/"+page.ID+"/label", &LabelInfo{},
-    ).SetQuery(map[string]string{"name": label}).Delete()
+	).SetQuery(map[string]string{"name": label}).Delete()
 	if err != nil {
 		return nil, err
 	}
