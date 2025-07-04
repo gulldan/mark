@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kovetskiy/gopencils"
 	"github.com/kovetskiy/lorg"
@@ -48,7 +49,8 @@ type PageInfo struct {
 	Type  string `json:"type"`
 
 	Version struct {
-		Number int64 `json:"number"`
+		Number  int64  `json:"number"`
+		Message string `json:"message"`
 	} `json:"version"`
 
 	Ancestors []struct {
@@ -103,7 +105,7 @@ func NewAPI(baseURL string, username string, password string) *API {
 			Password: password,
 		}
 	}
-	rest := gopencils.Api(baseURL+"/rest/api", auth)
+	rest := gopencils.Api(baseURL+"/rest/api", auth, 3) // set option for 3 retries on failure
 	if username == "" {
 		if rest.Headers == nil {
 			rest.Headers = http.Header{}
@@ -111,10 +113,7 @@ func NewAPI(baseURL string, username string, password string) *API {
 		rest.SetHeader("Authorization", fmt.Sprintf("Bearer %s", password))
 	}
 
-	json := gopencils.Api(
-		baseURL+"/rpc/json-rpc/confluenceservice-v2",
-		auth,
-	)
+	json := gopencils.Api(baseURL+"/rpc/json-rpc/confluenceservice-v2", auth, 3)
 
 	if log.GetLevel() == lorg.LevelTrace {
 		rest.Logger = &tracer{"rest:"}
@@ -258,7 +257,7 @@ func (api *API) CreateAttachment(
 
 	if len(result.Results) == 0 {
 		return info, errors.New(
-			"Confluence REST API for creating attachments returned " +
+			"the Confluence REST API for creating attachments returned " +
 				"0 json objects, expected at least 1",
 		)
 	}
@@ -512,7 +511,7 @@ func (api *API) CreatePage(
 	return request.Response.(*PageInfo), nil
 }
 
-func (api *API) UpdatePage(page *PageInfo, newContent string, minorEdit bool, versionMessage string, newLabels []string, appearance string) error {
+func (api *API) UpdatePage(page *PageInfo, newContent string, minorEdit bool, versionMessage string, newLabels []string, appearance string, emojiString string) error {
 	nextPageVersion := page.Version.Number + 1
 	oldAncestors := []map[string]interface{}{}
 
@@ -520,6 +519,29 @@ func (api *API) UpdatePage(page *PageInfo, newContent string, minorEdit bool, ve
 		// picking only the last one, which is required by confluence
 		oldAncestors = []map[string]interface{}{
 			{"id": page.Ancestors[len(page.Ancestors)-1].ID},
+		}
+	}
+
+	properties := map[string]interface{}{
+		// Fix to set full-width as has changed on Confluence APIs again.
+		// https://jira.atlassian.com/browse/CONFCLOUD-65447
+		//
+		"content-appearance-published": map[string]interface{}{
+			"value": appearance,
+		},
+		// content-appearance-draft should not be set as this is impacted by
+		// the user editor default configurations - which caused the sporadic published widths.
+	}
+
+	if emojiString != "" {
+		r, _ := utf8.DecodeRuneInString(emojiString)
+		unicodeHex := fmt.Sprintf("%x", r)
+
+		properties["emoji-title-draft"] = map[string]interface{}{
+			"value": unicodeHex,
+		}
+		properties["emoji-title-published"] = map[string]interface{}{
+			"value": unicodeHex,
 		}
 	}
 
@@ -540,16 +562,7 @@ func (api *API) UpdatePage(page *PageInfo, newContent string, minorEdit bool, ve
 			},
 		},
 		"metadata": map[string]interface{}{
-			// Fix to set full-width as has changed on Confluence APIs again.
-			// https://jira.atlassian.com/browse/CONFCLOUD-65447
-			//
-			"properties": map[string]interface{}{
-				"content-appearance-published": map[string]interface{}{
-					"value": appearance,
-				},
-			},
-			// content-appearance-draft should not be set as this is impacted by
-			// the user editor default configurations - which caused the sporadic published widths.
+			"properties": properties,
 		},
 	}
 
@@ -600,7 +613,7 @@ func (api *API) DeletePageLabel(page *PageInfo, label string) (*LabelInfo, error
 
 	request, err := api.rest.Res(
 		"content/"+page.ID+"/label", &LabelInfo{},
-    ).SetQuery(map[string]string{"name": label}).Delete()
+	).SetQuery(map[string]string{"name": label}).Delete()
 	if err != nil {
 		return nil, err
 	}
@@ -778,21 +791,23 @@ func (api *API) RestrictPageUpdates(
 func newErrorStatusNotOK(request *gopencils.Resource) error {
 	if request.Raw.StatusCode == http.StatusUnauthorized {
 		return errors.New(
-			"Confluence API returned unexpected status: 401 (Unauthorized)",
+			"the Confluence API returned unexpected status: 401 (Unauthorized)",
 		)
 	}
 
 	if request.Raw.StatusCode == http.StatusNotFound {
 		return errors.New(
-			"Confluence API returned unexpected status: 404 (Not Found)",
+			"the Confluence API returned unexpected status: 404 (Not Found)",
 		)
 	}
 
 	output, _ := io.ReadAll(request.Raw.Body)
-	defer request.Raw.Body.Close()
+	defer func() {
+		_ = request.Raw.Body.Close()
+	}()
 
 	return fmt.Errorf(
-		"Confluence API returned unexpected status: %v, "+
+		"the Confluence API returned unexpected status: %v, "+
 			"output: %q",
 		request.Raw.Status, output,
 	)
