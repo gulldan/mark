@@ -7,8 +7,6 @@
 Mark — a tool for syncing your markdown documentation with Atlassian Confluence
 pages.
 
-Read the blog post discussing the tool — <https://samizdat.dev/use-markdown-for-confluence/>
-
 This is very useful if you store documentation to your software in a Git
 repository and don't want to do an extra job of updating Confluence page using
 a tinymce wysiwyg enterprise core editor which always breaks everything.
@@ -32,6 +30,7 @@ File in the extended format should follow the specification:
 <!-- Attachment: <local path> -->
 <!-- Label: <label 1> -->
 <!-- Label: <label 2> -->
+<!-- Image-Align: <left|center|right> -->
 
 <page contents>
 ```
@@ -74,6 +73,14 @@ Setting the sidebar creates a column on the right side.  You're able to add any 
 ```
 
 You can set a page emoji icon by specifying the icon in the headers.
+
+```markdown
+<!-- Image-Align: center -->
+```
+
+You can set the alignment for all images in the page. Common values are `left`, `center`, and `right`. Can also be set globally via the `--image-align` CLI option (per-page header takes precedence).
+
+**Note**: Images with width >= 760px automatically use `center` instead of the configured alignment, as Confluence requires this for wide images.
 
 Mark supports Go templates, which can be included into article by using path
 to the template relative to current working dir, e.g.:
@@ -177,6 +184,25 @@ The key's value must be a string which defines the template's content.
   </tblbox>
 ```
 
+## Automatic Page Title
+
+If you don't want to specify the page title in the metadata of each file, `mark` provides two ways to set it automatically.
+
+### From the first H1 heading
+
+You can use the `--title-from-h1` flag to extract the page title from the first H1 heading in the markdown file. If no H1 heading is found, the title must be set in the page metadata.
+
+### From the filename
+
+You can use the `--title-from-filename` flag to use the filename (without the extension) as the page title. `mark` will automatically convert the filename to a more readable title by:
+
+* Replacing underscores (`_`) and dashes (`-`) with spaces.
+* Applying title case to the filename.
+
+For example, a file named `my_awesome-page.md` will have the title "My Awesome Page".
+
+These two options are mutually exclusive. If both flags are provided, `mark` will produce an error.
+
 ## Customizing the page layout
 
 If you set the Layout to plain, the page layout can be customized using HTML comments inside the markdown:
@@ -220,48 +246,38 @@ Placeholder
 
 ### Code Blocks
 
-If you have long code blocks, you can make them collapsible with the [Code Block Macro]:
-
-```bash collapse
+````text
+```bash
 ...
 some long bash code block
 ...
 ```
+````
 
-And you can also add a title:
+| Parameter                      | Default |
+| ------------------------------ | ------- |
+| `collapse`                     | false   |
+| `title`                        | none    |
+| `linenumbers`                  | false   |
+| `1` (any number for firstline) | 1       |
 
-```bash collapse title Some long long bash function
-...
-some long bash code block
-...
-```
+Example:
 
-Or linenumbers, by giving the first number
+* `bash collapse`
+  If you have long code blocks, you can make them collapsible.
+* `bash collapse title Some long long bash function`
+  And you can also add a title.
+* `bash linenumbers collapse title Some long long bash function`
+  And linenumbers.
+* `bash 1 collapse title Some long long bash function`
+  Or directly give a number as firstline number.
+* `bash 1 collapse midnight title Some long long bash function`
+  And even themes.
+* `- 1 collapse midnight title Some long long code`
+  Please note that, if you want to have a code block without a language
+  use `-` as the first character, if you want to have the other goodies.
 
-```bash 1 collapse title Some long long bash function
-...
-some long bash code block
-...
-```
-
-And even themes
-
-```bash 1 collapse midnight title Some long long bash function
-...
-some long bash code block
-...
-```
-
-Please note that, if you want to have a code block without a language
-use `-` as the first character, if you want to have the other goodies
-
-``` - 1 collapse midnight title Some long long code
-...
-some long code block
-...
-```
-
-[Code Block Macro]: https://confluence.atlassian.com/doc/code-block-macro-139390.html
+More details at Confluence [Code Block Macro](https://confluence.atlassian.com/doc/code-block-macro-139390.html) doc.
 
 ### Block Quotes
 
@@ -271,14 +287,26 @@ Block Quotes are converted to Confluence Info/Warn/Note box when the following c
 1. The first line of the BlockQuote contains one of the following patterns `Info/Warn/Note` or [Github MD Alerts style](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts) `[!NOTE]/[!TIP]/[!IMPORTANT]/[!WARNING]/[!CAUTION]`
 
 | Github Alerts | Confluence |
-|---------------|------------|
-| Tip (green lightbulb)   | Tip (green checkmark in circle) |
+| --- | --- |
+| Tip (green lightbulb) | Tip (green checkmark in circle) |
 | Note (blue I in circle) | Info (blue I in circle) |
 | Important (purple exclamation mark in speech bubble) | Info (blue I in circle) |
 | Warning (yellow exclamation mark in triangle) | Note (yellow exclamation mark in triangle) |
 | Caution (red exclamation mark in hexagon) | Warning (red exclamation mark in hexagon) |
 
 In any other case the default behaviour will be resumed and html `<blockquote>` tag will be used
+
+### Task Lists
+
+Mark supports [GitHub Flavored Markdown task lists](https://github.github.com/gfm/#task-list-items-extension-).
+Task lists are automatically converted to Confluence `ac:task-list` elements.
+
+```markdown
+- [x] Finished task
+- [ ] Unfinished task
+```
+
+If a list is "mixed" (contains both tasks and regular list items), it will fall back to a standard HTML list with textual markers like `[x]` or `[ ]` to ensure validity in Confluence storage format.
 
 ## Template & Macros
 
@@ -497,6 +525,10 @@ By default, mark provides several built-in templates and macros:
   * Name: Name of the file
   * Width: Width of the video (optional)
   * AutoPlay: Start playing the file on page load (default: false)
+
+* template `ac:view-file`
+  * Name: Name of the file
+  * Height: height of the view
 
 * macro `@{...}` to mention user by name specified in the braces.
 
@@ -726,11 +758,6 @@ graph TD;
 A-->B;
 ```
 
-In order to properly render mermaid, you can choose between the following mermaid providers:
-
-* "mermaid-go" via [mermaid.go](https://github.com/dreampuf/mermaid.go)
-* "cloudscript" via [cloudscript-io-mermaid-addon](https://marketplace.atlassian.com/apps/1219878/cloudscript-io-mermaid-addon) (deprecated)
-
 ### Render D2 Diagram
 
 Optionally you can enable [D2](https://github.com/terrastruct/d2) rendering via `--features="d2"`.
@@ -739,6 +766,16 @@ All you need is a codeblock marked as "d2".
 
 ```d2
 X -> Y
+```
+
+### MkDocs' Admonitions
+
+Optionally you can enable mkdocs-style [Admonitions](https://squidfunk.github.io/mkdocs-material/reference/admonitions/) via `--features="mkdocsadmonitions"`.
+
+When enabled, this renders note, warning, tip, info admonitions as Confluence alerts.
+
+```markdown
+!!! note
 ```
 
 ## Installation
@@ -750,16 +787,10 @@ brew tap kovetskiy/mark
 brew install mark
 ```
 
-### Go Install / Go Get
+### Go Install
 
 ```bash
-go install github.com/kovetskiy/mark@latest
-```
-
-For older versions
-
-```bash
-go get -v github.com/kovetskiy/mark
+go install github.com/kovetskiy/mark/v16/cmd/mark@latest
 ```
 
 ### Releases
@@ -793,22 +824,23 @@ USAGE:
    mark [global options]
 
 VERSION:
-   14.0.2
+   v16.x.x
 
 DESCRIPTION:
    Mark is a tool to update Atlassian Confluence pages from markdown. Documentation is available here: https://github.com/kovetskiy/mark
 
 GLOBAL OPTIONS:
    --files string, -f string                use specified markdown file(s) for converting to html. Supports file globbing patterns (needs to be quoted). [$MARK_FILES]
-   --continue-on-error                      don't exit if an error occurs while processing a file, continue processing remaining files. (default: false) [$MARK_CONTINUE_ON_ERROR]
-   --compile-only                           show resulting HTML and don't update Confluence page content. (default: false) [$MARK_COMPILE_ONLY]
-   --dry-run                                resolve page and ancestry, show resulting HTML and exit. (default: false) [$MARK_DRY_RUN]
-   --edit-lock, -k                          lock page editing to current user only to prevent accidental manual edits over Confluence Web UI. (default: false) [$MARK_EDIT_LOCK]
-   --drop-h1                                don't include the first H1 heading in Confluence output. (default: false) [$MARK_DROP_H1]
-   --strip-linebreaks, -L                   remove linebreaks inside of tags, to accommodate non-standard Confluence behavior (default: false) [$MARK_STRIP_LINEBREAKS]
-   --title-from-h1                          extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata. (default: false) [$MARK_TITLE_FROM_H1]
-   --title-append-generated-hash            appends a short hash generated from the path of the page (space, parents, and title) to the title (default: false) [$MARK_TITLE_APPEND_GENERATED_HASH]
-   --minor-edit                             don't send notifications while updating Confluence page. (default: false) [$MARK_MINOR_EDIT]
+   --continue-on-error                      don't exit if an error occurs while processing a file, continue processing remaining files. [$MARK_CONTINUE_ON_ERROR]
+   --compile-only                           show resulting HTML and don't update Confluence page content. [$MARK_COMPILE_ONLY]
+   --dry-run                                resolve page and ancestry, show resulting HTML and exit. [$MARK_DRY_RUN]
+   --edit-lock, -k                          lock page editing to current user only to prevent accidental manual edits over Confluence Web UI. [$MARK_EDIT_LOCK]
+   --drop-h1                                don't include the first H1 heading in Confluence output. [$MARK_DROP_H1]
+   --strip-linebreaks, -L                   remove linebreaks inside of tags, to accommodate non-standard Confluence behavior [$MARK_STRIP_LINEBREAKS]
+   --title-from-h1                          extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata. Mutually exclusive with --title-from-filename. [$MARK_TITLE_FROM_H1]
+   --title-from-filename                    use the filename (without extension) as the Confluence page title if no explicit page title is set in the metadata. Mutually exclusive with --title-from-h1. [$MARK_TITLE_FROM_FILENAME]
+   --title-append-generated-hash            appends a short hash generated from the path of the page (space, parents, and title) to the title [$MARK_TITLE_APPEND_GENERATED_HASH]
+   --minor-edit                             don't send notifications while updating Confluence page. [$MARK_MINOR_EDIT]
    --version-message string                 add a message to the page version, to explain the edit (default: "") [$MARK_VERSION_MESSAGE]
    --color string                           display logs in color. Possible values: auto, never. (default: "auto") [$MARK_COLOR]
    --log-level string                       set the log level. Possible values: TRACE, DEBUG, INFO, WARNING, ERROR, FATAL. (default: "info") [$MARK_LOG_LEVEL]
@@ -816,17 +848,19 @@ GLOBAL OPTIONS:
    --password string, -p string             use specified token for updating Confluence page. Specify - as password to read password from stdin, or your Personal access token. Username is not mandatory if personal access token is provided. For more info please see: https://developer.atlassian.com/server/confluence/confluence-server-rest-api/#authentication. [$MARK_PASSWORD]
    --target-url string, -l string           edit specified Confluence page. If -l is not specified, file should contain metadata (see above). [$MARK_TARGET_URL]
    --base-url string, -b string             base URL for Confluence. Alternative option for base_url config field. [$MARK_BASE_URL]
-   --config string, -c string               use the specified configuration file. (default: $HOME/.config/mark.toml") [$MARK_CONFIG]
-   --ci                                     run on CI mode. It won't fail if files are not found. (default: false) [$MARK_CI]
+   --config string, -c string               use the specified configuration file. (default: "${HOME}/.config/mark.toml") [$MARK_CONFIG]
+   --ci                                     run on CI mode. It won't fail if files are not found. [$MARK_CI]
    --space string                           use specified space key. If the space key is not specified, it must be set in the page metadata. [$MARK_SPACE]
    --parents string                         A list containing the parents of the document separated by parents-delimiter (default: '/'). These will be prepended to the ones defined in the document itself. [$MARK_PARENTS]
    --parents-delimiter string               The delimiter used for the parents list (default: "/") [$MARK_PARENTS_DELIMITER]
-   --mermaid-provider string                defines the mermaid provider to use. Supported options are: cloudscript, mermaid-go. (default: "cloudscript") [$MARK_MERMAID_PROVIDER]
+   --content-appearance string              default content appearance for pages without a Content-Appearance header. Possible values: full-width, fixed. [$MARK_CONTENT_APPEARANCE]
    --mermaid-scale float                    defines the scaling factor for mermaid renderings. (default: 1) [$MARK_MERMAID_SCALE]
    --include-path string                    Path for shared includes, used as a fallback if the include doesn't exist in the current directory. [$MARK_INCLUDE_PATH]
-   --changes-only                           Avoids re-uploading pages that haven't changed since the last run. (default: false) [$MARK_CHANGES_ONLY]
+   --changes-only                           Avoids re-uploading pages that haven't changed since the last run. [$MARK_CHANGES_ONLY]
    --d2-scale float                         defines the scaling factor for d2 renderings. (default: 1) [$MARK_D2_SCALE]
-   --features string [ --features string ]  Enables optional features. Current features: d2, mermaid (default: "mermaid") [$MARK_FEATURES]
+   --features string [ --features string ]  Enables optional features. Current features: d2, mermaid, mention, mkdocsadmonitions (default: "mermaid", "mention") [$MARK_FEATURES]
+   --insecure-skip-tls-verify               skip TLS certificate verification (useful for self-signed certificates) [$MARK_INSECURE_SKIP_TLS_VERIFY]
+   --image-align string                     set image alignment (left, center, right). Can be overridden per-file via the Image-Align header. [$MARK_IMAGE_ALIGN]
    --help, -h                               show help
    --version, -v                            print the version
 ```
@@ -841,6 +875,7 @@ password = "password-or-api-key-for-confluence-cloud"
 base-url = "http://confluence.local"
 title-from-h1 = true
 drop-h1 = true
+image-align = "center"
 ```
 
 **NOTE**: Labels aren't supported when using `minor-edit`!

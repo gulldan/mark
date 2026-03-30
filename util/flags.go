@@ -1,6 +1,11 @@
 package util
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	altsrctoml "github.com/urfave/cli-altsrc/v3/toml"
 	"github.com/urfave/cli/v3"
@@ -58,8 +63,14 @@ var Flags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:    "title-from-h1",
 		Value:   false,
-		Usage:   "extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata.",
+		Usage:   "extract page title from a leading H1 heading. If no H1 heading on a page exists, then title must be set in the page metadata. Mutually exclusive with --title-from-filename.",
 		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_TITLE_FROM_H1"), altsrctoml.TOML("title-from-h1", altsrc.NewStringPtrSourcer(&filename))),
+	},
+	&cli.BoolFlag{
+		Name:    "title-from-filename",
+		Value:   false,
+		Usage:   "use the filename (without extension) as the Confluence page title if no explicit page title is set in the metadata. Mutually exclusive with --title-from-h1.",
+		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_TITLE_FROM_FILENAME"), altsrctoml.TOML("title-from-filename", altsrc.NewStringPtrSourcer(&filename))),
 	},
 	&cli.BoolFlag{
 		Name:    "title-append-generated-hash",
@@ -156,10 +167,13 @@ var Flags = []cli.Flag{
 		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_PARENTS_DELIMITER"), altsrctoml.TOML("parents-delimiter", altsrc.NewStringPtrSourcer(&filename))),
 	},
 	&cli.StringFlag{
-		Name:    "mermaid-provider",
-		Value:   "cloudscript",
-		Usage:   "defines the mermaid provider to use. Supported options are: cloudscript, mermaid-go.",
-		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_MERMAID_PROVIDER"), altsrctoml.TOML("mermaid-provider", altsrc.NewStringPtrSourcer(&filename))),
+		Name:  "content-appearance",
+		Value: "",
+		Usage: "default content appearance for pages without a Content-Appearance header. Possible values: full-width, fixed.",
+		Sources: cli.NewValueSourceChain(
+			cli.EnvVar("MARK_CONTENT_APPEARANCE"),
+			altsrctoml.TOML("content-appearance", altsrc.NewStringPtrSourcer(&filename)),
+		),
 	},
 	&cli.FloatFlag{
 		Name:    "mermaid-scale",
@@ -189,8 +203,42 @@ var Flags = []cli.Flag{
 
 	&cli.StringSliceFlag{
 		Name:    "features",
-		Value:   []string{"mermaid"},
-		Usage:   "Enables optional features. Current features: d2, mermaid, mkdocsadmonitions",
+		Value:   []string{"mermaid", "mention"},
+		Usage:   "Enables optional features. Current features: d2, mermaid, mention, mkdocsadmonitions",
 		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_FEATURES"), altsrctoml.TOML("features", altsrc.NewStringPtrSourcer(&filename))),
 	},
+	&cli.BoolFlag{
+		Name:    "insecure-skip-tls-verify",
+		Value:   false,
+		Usage:   "skip TLS certificate verification (useful for self-signed certificates)",
+		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_INSECURE_SKIP_TLS_VERIFY"), altsrctoml.TOML("insecure-skip-tls-verify", altsrc.NewStringPtrSourcer(&filename))),
+	},
+	&cli.StringFlag{
+		Name:    "image-align",
+		Value:   "",
+		Usage:   "set image alignment (left, center, right). Can be overridden per-file via the Image-Align header.",
+		Sources: cli.NewValueSourceChain(cli.EnvVar("MARK_IMAGE_ALIGN"), altsrctoml.TOML("image-align", altsrc.NewStringPtrSourcer(&filename))),
+	},
+}
+
+// CheckFlags validates combinations and values of global flags.
+func CheckFlags(context context.Context, command *cli.Command) (context.Context, error) {
+	if command.Bool("title-from-h1") && command.Bool("title-from-filename") {
+		return context, errors.New("flags --title-from-h1 and --title-from-filename are mutually exclusive. Please specify only one")
+	}
+
+	contentAppearance := strings.TrimSpace(command.String("content-appearance"))
+	if contentAppearance != "" {
+		switch contentAppearance {
+		case "full-width", "fixed":
+			// ok
+		default:
+			return context, fmt.Errorf(
+				"invalid value for --content-appearance: %q (expected: full-width or fixed)",
+				contentAppearance,
+			)
+		}
+	}
+
+	return context, nil
 }

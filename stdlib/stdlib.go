@@ -1,18 +1,16 @@
 package stdlib
 
 import (
+	"fmt"
+	"html"
 	"strings"
 	"text/template"
 
-	"github.com/kovetskiy/mark/confluence"
-	"github.com/kovetskiy/mark/macro"
-	"github.com/reconquest/pkg/log"
-
-	"github.com/reconquest/karma-go"
+	"github.com/kovetskiy/mark/v16/confluence"
+	"github.com/rs/zerolog/log"
 )
 
 type Lib struct {
-	Macros    []macro.Macro
 	Templates *template.Template
 }
 
@@ -27,37 +25,7 @@ func New(api *confluence.API) (*Lib, error) {
 		return nil, err
 	}
 
-	lib.Macros, err = macros(lib.Templates)
-	if err != nil {
-		return nil, err
-	}
-
 	return &lib, nil
-}
-
-func macros(templates *template.Template) ([]macro.Macro, error) {
-	text := func(line ...string) []byte {
-		return []byte(strings.Join(line, "\n"))
-	}
-
-	macros, _, err := macro.ExtractMacros(
-		"",
-		"",
-		text(
-			`<!-- Macro: @\{([^}]+)\}`,
-			`     Template: ac:link:user`,
-			`     Name: ${1} -->`,
-
-			// TODO(seletskiy): more macros here
-		),
-
-		templates,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return macros, nil
 }
 
 func templates(api *confluence.API) (*template.Template, error) {
@@ -68,9 +36,12 @@ func templates(api *confluence.API) (*template.Template, error) {
 	templates := template.New(`stdlib`).Funcs(
 		template.FuncMap{
 			"user": func(name string) *confluence.User {
+				if api == nil {
+					return nil
+				}
 				user, err := api.GetUserByName(name)
 				if err != nil {
-					log.Error(err)
+					log.Error().Err(err).Send()
 				}
 
 				return user
@@ -91,6 +62,9 @@ func templates(api *confluence.API) (*template.Template, error) {
 					"/",
 					"_",
 				)
+			},
+			"xmlesc": func(s string) string {
+				return html.EscapeString(s)
 			},
 		},
 	)
@@ -114,22 +88,21 @@ func templates(api *confluence.API) (*template.Template, error) {
 
 		// This template is used for rendering code in ```
 		`ac:code`: text(
-			`<ac:structured-macro ac:name="{{ if eq .Language "mermaid" }}cloudscript-confluence-mermaid{{ else }}code{{ end }}">`,
-			/**/ `{{ if eq .Language "mermaid" }}<ac:parameter ac:name="showSource">true</ac:parameter>{{ else }}`,
-			/**/ `<ac:parameter ac:name="language">{{ .Language }}</ac:parameter>{{ end }}`,
+			`<ac:structured-macro ac:name="code">`,
+			/**/ `<ac:parameter ac:name="language">{{ .Language | xmlesc }}</ac:parameter>`,
 			/**/ `<ac:parameter ac:name="collapse">{{ .Collapse }}</ac:parameter>`,
-			/**/ `{{ if .Theme }}<ac:parameter ac:name="theme">{{ .Theme }}</ac:parameter>{{ end }}`,
+			/**/ `{{ if .Theme }}<ac:parameter ac:name="theme">{{ .Theme | xmlesc }}</ac:parameter>{{ end }}`,
 			/**/ `{{ if .Linenumbers }}<ac:parameter ac:name="linenumbers">{{ .Linenumbers }}</ac:parameter>{{ end }}`,
 			/**/ `{{ if .Firstline }}<ac:parameter ac:name="firstline">{{ .Firstline }}</ac:parameter>{{ end }}`,
-			/**/ `{{ if .Title }}<ac:parameter ac:name="title">{{ .Title }}</ac:parameter>{{ end }}`,
+			/**/ `{{ if .Title }}<ac:parameter ac:name="title">{{ .Title | xmlesc }}</ac:parameter>{{ end }}`,
 			/**/ `<ac:plain-text-body><![CDATA[{{ .Text | cdata }}]]></ac:plain-text-body>`,
 			`</ac:structured-macro>`,
 		),
 
 		`ac:status`: text(
 			`<ac:structured-macro ac:name="status">`,
-			`<ac:parameter ac:name="colour">{{ or .Color "Grey" }}</ac:parameter>`,
-			`<ac:parameter ac:name="title">{{ or .Title .Color }}</ac:parameter>`,
+			`<ac:parameter ac:name="colour">{{ or .Color "Grey" | xmlesc }}</ac:parameter>`,
+			`<ac:parameter ac:name="title">{{ or .Title .Color | xmlesc }}</ac:parameter>`,
 			`<ac:parameter ac:name="subtle">{{ or .Subtle false }}</ac:parameter>`,
 			`</ac:structured-macro>`,
 		),
@@ -151,6 +124,9 @@ func templates(api *confluence.API) (*template.Template, error) {
 		`ac:jira:ticket`: text(
 			`<ac:structured-macro ac:name="jira">`,
 			`<ac:parameter ac:name="key">{{ .Ticket }}</ac:parameter>`,
+			`{{ if .Server }}`,
+			`<ac:parameter ac:name="server">{{ .Server }}</ac:parameter>`,
+			`{{ end }}`,
 			`</ac:structured-macro>`,
 		),
 
@@ -184,7 +160,7 @@ func templates(api *confluence.API) (*template.Template, error) {
 		`ac:box`: text(
 			`<ac:structured-macro ac:name="{{ .Name }}">`,
 			`<ac:parameter ac:name="icon">{{ or .Icon "false" }}</ac:parameter>`,
-			`{{ if .Title }}<ac:parameter ac:name="title">{{ .Title }}</ac:parameter>{{ end }}`,
+			`{{ if .Title }}<ac:parameter ac:name="title">{{ .Title | xmlesc }}</ac:parameter>{{ end }}`,
 			`<ac:rich-text-body>{{ .Body }}</ac:rich-text-body>`,
 			`</ac:structured-macro>`,
 		),
@@ -234,6 +210,11 @@ func templates(api *confluence.API) (*template.Template, error) {
 
 		`ac:image`: text(
 			`<ac:image`,
+			`{{ if .Align }} ac:align="{{ .Align }}"{{ end }}`,
+			`{{ if .Layout }} ac:layout="{{ .Layout }}"{{ end }}`,
+			`{{ if .OriginalWidth }} ac:original-width="{{ .OriginalWidth }}"{{ end }}`,
+			`{{ if .OriginalHeight }} ac:original-height="{{ .OriginalHeight }}"{{ end }}`,
+			`{{ if .Width }} ac:custom-width="true"{{ end }}`,
 			`{{ if .Width }} ac:width="{{ .Width }}"{{ end }}`,
 			`{{ if .Height }} ac:height="{{ .Height }}"{{ end }}`,
 			`{{ if .Title }} ac:title="{{ .Title }}"{{ end }}`,
@@ -449,17 +430,21 @@ func templates(api *confluence.API) (*template.Template, error) {
 			`<ac:parameter ac:name="autoplay">{{ or .AutoPlay "false"}}</ac:parameter>`,
 			`</ac:structured-macro>`,
 		),
+		/* https://confluence.atlassian.com/conf59/view-file-macro-792499226.html */
+		`ac:view-file`: text(
+			`<ac:structured-macro ac:name="view-file">`,
+			`<ac:parameter ac:name="name">`,
+			`<ri:attachment ri:filename="{{ .Name | convertAttachment }}"/>`,
+			`</ac:parameter>`,
+			`<ac:parameter ac:name="height">{{ or .Height 250 }}</ac:parameter>`,
+			`</ac:structured-macro>`,
+		),
 
 		// TODO(seletskiy): more templates here
 	} {
 		templates, err = templates.New(name).Parse(body)
 		if err != nil {
-			return nil, karma.
-				Describe("template", body).
-				Format(
-					err,
-					"unable to parse template",
-				)
+			return nil, fmt.Errorf("unable to parse template %q (body=%s): %w", name, body, err)
 		}
 	}
 

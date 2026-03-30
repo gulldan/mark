@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"slices"
 
-	"github.com/kovetskiy/mark/attachment"
-	cparser "github.com/kovetskiy/mark/parser"
-	crenderer "github.com/kovetskiy/mark/renderer"
-	"github.com/kovetskiy/mark/stdlib"
-	"github.com/kovetskiy/mark/types"
-	"github.com/reconquest/pkg/log"
+	"github.com/kovetskiy/mark/v16/attachment"
+	cparser "github.com/kovetskiy/mark/v16/parser"
+	crenderer "github.com/kovetskiy/mark/v16/renderer"
+	"github.com/kovetskiy/mark/v16/stdlib"
+	"github.com/kovetskiy/mark/v16/types"
+	"github.com/rs/zerolog/log"
 	mkDocsParser "github.com/stefanfritsch/goldmark-admonitions"
 	"github.com/yuin/goldmark"
 
@@ -53,9 +53,10 @@ func (c *ConfluenceExtension) Extend(m goldmark.Markdown) {
 		util.Prioritized(crenderer.NewConfluenceFencedCodeBlockRenderer(c.Stdlib, c, c.MarkConfig), 100),
 		util.Prioritized(crenderer.NewConfluenceHTMLBlockRenderer(c.Stdlib), 100),
 		util.Prioritized(crenderer.NewConfluenceHeadingRenderer(c.MarkConfig.DropFirstH1), 100),
-		util.Prioritized(crenderer.NewConfluenceImageRenderer(c.Stdlib, c, c.Path), 100),
+		util.Prioritized(crenderer.NewConfluenceImageRenderer(c.Stdlib, c, c.Path, c.MarkConfig.ImageAlign), 100),
 		util.Prioritized(crenderer.NewConfluenceParagraphRenderer(), 100),
 		util.Prioritized(crenderer.NewConfluenceLinkRenderer(), 100),
+		util.Prioritized(crenderer.NewConfluenceTaskListRenderer(), 100),
 	))
 
 	if slices.Contains(c.MarkConfig.Features, "mkdocsadmonitions") {
@@ -70,6 +71,18 @@ func (c *ConfluenceExtension) Extend(m goldmark.Markdown) {
 		))
 	}
 
+	if slices.Contains(c.MarkConfig.Features, "mention") {
+		m.Parser().AddOptions(
+			parser.WithInlineParsers(
+				util.Prioritized(cparser.NewMentionParser(), 99),
+			),
+		)
+
+		m.Renderer().AddOptions(renderer.WithNodeRenderers(
+			util.Prioritized(crenderer.NewConfluenceMentionRenderer(c.Stdlib), 100),
+		))
+	}
+
 	m.Parser().AddOptions(parser.WithInlineParsers(
 		// Must be registered with a higher priority than goldmark's linkParser to make sure goldmark doesn't parse
 		// the <ac:*/> tags.
@@ -77,8 +90,8 @@ func (c *ConfluenceExtension) Extend(m goldmark.Markdown) {
 	))
 }
 
-func CompileMarkdown(markdown []byte, stdlib *stdlib.Lib, path string, cfg types.MarkConfig) (string, []attachment.Attachment) {
-	log.Tracef(nil, "rendering markdown:\n%s", string(markdown))
+func CompileMarkdown(markdown []byte, stdlib *stdlib.Lib, path string, cfg types.MarkConfig) (string, []attachment.Attachment, error) {
+	log.Trace().Msgf("rendering markdown:\n%s", string(markdown))
 
 	confluenceExtension := NewConfluenceExtension(stdlib, path, cfg)
 
@@ -106,12 +119,12 @@ func CompileMarkdown(markdown []byte, stdlib *stdlib.Lib, path string, cfg types
 	err := converter.Convert(markdown, &buf, parser.WithContext(ctx))
 
 	if err != nil {
-		panic(err)
+		return "", nil, err
 	}
 
 	html := buf.Bytes()
 
-	log.Tracef(nil, "rendered markdown to html:\n%s", string(html))
+	log.Trace().Msgf("rendered markdown to html:\n%s", string(html))
 
-	return string(html), confluenceExtension.Attachments
+	return string(html), confluenceExtension.Attachments, nil
 }

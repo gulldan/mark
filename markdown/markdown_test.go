@@ -2,6 +2,7 @@ package mark_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -9,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	mark "github.com/kovetskiy/mark/markdown"
-	"github.com/kovetskiy/mark/stdlib"
-	"github.com/kovetskiy/mark/types"
-	"github.com/kovetskiy/mark/util"
+	mark "github.com/kovetskiy/mark/v16/markdown"
+	"github.com/kovetskiy/mark/v16/stdlib"
+	"github.com/kovetskiy/mark/v16/types"
+	"github.com/kovetskiy/mark/v16/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/cli/v3"
 )
@@ -51,6 +52,7 @@ func TestCompileMarkdown(t *testing.T) {
 	}
 
 	for _, filename := range testcases {
+		fmt.Printf("Testing: %v\n", filename)
 		lib, err := stdlib.New(nil)
 		if err != nil {
 			panic(err)
@@ -58,15 +60,14 @@ func TestCompileMarkdown(t *testing.T) {
 		markdown, htmlname, html := loadData(t, filename, "")
 
 		cfg := types.MarkConfig{
-			MermaidProvider: "",
-			MermaidScale:    1.0,
-			D2Scale:         1.0,
-			DropFirstH1:     false,
-			StripNewlines:   false,
-			Features:        []string{"mkdocsadmonitions"},
+			MermaidScale:  1.0,
+			D2Scale:       1.0,
+			DropFirstH1:   false,
+			StripNewlines: false,
+			Features:      []string{"mkdocsadmonitions", "mention"},
 		}
 
-		actual, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
+		actual, _, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
 		test.EqualValues(strings.TrimSuffix(string(html), "\n"), strings.TrimSuffix(actual, "\n"), filename+" vs "+htmlname)
 	}
 }
@@ -101,15 +102,14 @@ func TestCompileMarkdownDropH1(t *testing.T) {
 		markdown, htmlname, html := loadData(t, filename, variant)
 
 		cfg := types.MarkConfig{
-			MermaidProvider: "",
-			MermaidScale:    1.0,
-			D2Scale:         1.0,
-			DropFirstH1:     true,
-			StripNewlines:   false,
-			Features:        []string{"mkdocsadmonitions"},
+			MermaidScale:  1.0,
+			D2Scale:       1.0,
+			DropFirstH1:   true,
+			StripNewlines: false,
+			Features:      []string{"mkdocsadmonitions", "mention"},
 		}
 
-		actual, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
+		actual, _, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
 		test.EqualValues(strings.TrimSuffix(string(html), "\n"), strings.TrimSuffix(actual, "\n"), filename+" vs "+htmlname)
 
 	}
@@ -137,7 +137,7 @@ func TestCompileMarkdownStripNewlines(t *testing.T) {
 		}
 		var variant string
 		switch filename {
-		case "testdata/quotes.md", "testdata/codes.md", "testdata/newlines.md", "testdata/macro-include.md", "testdata/admonitions.md":
+		case "testdata/quotes.md", "testdata/codes.md", "testdata/newlines.md", "testdata/macro-include.md", "testdata/admonitions.md", "testdata/mention.md":
 			variant = "-stripnewlines"
 		default:
 			variant = ""
@@ -146,15 +146,14 @@ func TestCompileMarkdownStripNewlines(t *testing.T) {
 		markdown, htmlname, html := loadData(t, filename, variant)
 
 		cfg := types.MarkConfig{
-			MermaidProvider: "",
-			MermaidScale:    1.0,
-			D2Scale:         1.0,
-			DropFirstH1:     false,
-			StripNewlines:   true,
-			Features:        []string{"mkdocsadmonitions"},
+			MermaidScale:  1.0,
+			D2Scale:       1.0,
+			DropFirstH1:   false,
+			StripNewlines: true,
+			Features:      []string{"mkdocsadmonitions", "mention"},
 		}
 
-		actual, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
+		actual, _, _ := mark.CompileMarkdown(markdown, lib, filename, cfg)
 		test.EqualValues(strings.TrimSuffix(string(html), "\n"), strings.TrimSuffix(actual, "\n"), filename+" vs "+htmlname)
 
 	}
@@ -182,5 +181,8 @@ func TestContinueOnError(t *testing.T) {
 	}
 
 	err := cmd.Run(context.TODO(), argList)
-	assert.NoError(t, err, "App should run without errors when continue-on-error is enabled")
+	// --continue-on-error processes all files even when some fail, but still
+	// returns an error to allow callers/CI to detect partial failures.
+	assert.Error(t, err, "App should report partial failure when continue-on-error is enabled and some files fail")
+	assert.ErrorContains(t, err, "one or more files failed to process")
 }

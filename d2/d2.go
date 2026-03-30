@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
 
-	"github.com/kovetskiy/mark/attachment"
-	"github.com/reconquest/pkg/log"
+	"github.com/kovetskiy/mark/v16/attachment"
+	"github.com/rs/zerolog/log"
 
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
@@ -57,14 +59,21 @@ func ProcessD2(title string, d2Diagram []byte, scale float64) (attachment.Attach
 		return attachment.Attachment{}, err
 	}
 
-	log.Debugf(nil, "Rendering: %q", title)
+	log.Debug().Msgf("Rendering: %q", title)
 	pngBytes, boxModel, err := convertSVGtoPNG(ctx, out, scale)
 	if err != nil {
 		return attachment.Attachment{}, err
 	}
 
-	checkSum, err := attachment.GetChecksum(bytes.NewReader(d2Diagram))
-	log.Debugf(nil, "Checksum: %q -> %s", title, checkSum)
+	scaleAsBytes := make([]byte, 8)
+
+	binary.LittleEndian.PutUint64(scaleAsBytes, math.Float64bits(scale))
+
+	d2Bytes := append(d2Diagram, scaleAsBytes...)
+
+	checkSum, err := attachment.GetChecksum(bytes.NewReader(d2Bytes))
+
+	log.Debug().Msgf("Checksum: %q -> %s", title, checkSum)
 
 	if err != nil {
 		return attachment.Attachment{}, err
